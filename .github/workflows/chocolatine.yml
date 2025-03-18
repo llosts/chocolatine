@@ -92,16 +92,10 @@ jobs:
         run: make clean
 
       - name: Check executables existence and permissions
+        shell: bash
         run: |
-          # Split the comma-separated list into an array
-          EXECUTABLES="${{ env.EXECUTABLES }}"
-          OLDIFS=$IFS
-          IFS=','
-          EXEC_ARRAY=($EXECUTABLES)
-          IFS=$OLDIFS
-          
-          # Check each executable
-          for exec_path in "${EXEC_ARRAY[@]}"; do
+          # Use a simple approach with 'tr' and 'xargs'
+          echo "${{ env.EXECUTABLES }}" | tr ',' '\n' | while read exec_path; do
             if [ ! -f "$exec_path" ]; then
               echo "::error::Executable not found: $exec_path"
               exit 1
