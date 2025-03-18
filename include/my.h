@@ -9,6 +9,8 @@
     #define MY_H_
 
     #define SUCCESS 0
-    #define ERROR 84
+    #define FAILURE 84
+
+int chocolatine(int argc, char const *argv[]);
 
 #endif
