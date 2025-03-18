@@ -93,8 +93,15 @@ jobs:
 
       - name: Check executables existence and permissions
         run: |
-          IFS=',' read -ra EXEC_LIST <<< "${{ env.EXECUTABLES }}"
-          for exec_path in "${EXEC_LIST[@]}"; do
+          # Split the comma-separated list into an array
+          EXECUTABLES="${{ env.EXECUTABLES }}"
+          OLDIFS=$IFS
+          IFS=','
+          EXEC_ARRAY=($EXECUTABLES)
+          IFS=$OLDIFS
+          
+          # Check each executable
+          for exec_path in "${EXEC_ARRAY[@]}"; do
             if [ ! -f "$exec_path" ]; then
               echo "::error::Executable not found: $exec_path"
               exit 1
