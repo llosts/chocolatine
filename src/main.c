@@ -10,7 +10,7 @@
 
 #include "my.h"
 
-int main(int argc, char const *argv[])
+int main(void)
 {
     printf("Hello World\n");
     return SUCCESS;
