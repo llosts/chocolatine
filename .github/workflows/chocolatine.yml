@@ -1,0 +1,124 @@
+name: Chocolatine Workflow
+
+# Define environment variables at workflow level
+env:
+  MIRROR_URL: ${{ secrets.MIRROR_URL }}
+  EXECUTABLES: ${{ secrets.EXECUTABLES }}
+
+# Run on push and pull request, except for branches starting with ga-ignore-
+on:
+  push:
+    branches-ignore:
+      - 'ga-ignore-**'
+  pull_request:
+    branches-ignore:
+      - 'ga-ignore-**'
+
+jobs:
+  # Job 1: Check coding style
+  check_coding_style:
+    name: Check Coding Style
+    # Skip if in mirror repository
+    if: ${{ github.event.repository.clone_url != env.MIRROR_URL }}
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/epitech/coding-style-checker:latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Only fetch what is necessary
+
+      - name: Run coding style checker
+        run: check.sh $(pwd) $(pwd)
+
+      - name: Display coding style errors as annotations
+        if: always()
+        run: |
+          if [ -f coding-style-reports.log ]; then
+            while IFS= read -r line; do
+              file_path=$(echo "$line" | cut -d':' -f1)
+              line_number=$(echo "$line" | cut -d':' -f2)
+              error_type=$(echo "$line" | cut -d':' -f3)
+              error_message=$(echo "$line" | cut -d':' -f4)
+              echo "::error file=${file_path},line=${line_number}::${error_type}: ${error_message}"
+            done < coding-style-reports.log
+            
+            # Make the job fail if there are any coding style errors
+            if [ -s coding-style-reports.log ]; then
+              exit 1
+            fi
+          else
+            echo "No coding style report found."
+          fi
+
+  # Job 2: Check program compilation
+  check_program_compilation:
+    name: Check Program Compilation
+    needs: check_coding_style
+    # Skip if in mirror repository
+    if: ${{ github.event.repository.clone_url != env.MIRROR_URL }}
+    runs-on: ubuntu-latest
+    container:
+      image: epitechcontent/epitest-docker
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compile project
+        run: make
+        timeout-minutes: 2
+
+      - name: Clean project
+        run: make clean
+
+      - name: Check executables existence and permissions
+        run: |
+          IFS=',' read -ra EXEC_LIST <<< "$EXECUTABLES"
+          for exec_path in "${EXEC_LIST[@]}"; do
+            if [ ! -f "$exec_path" ]; then
+              echo "::error::Executable not found: $exec_path"
+              exit 1
+            fi
+            if [ ! -x "$exec_path" ]; then
+              echo "::error::File exists but is not executable: $exec_path"
+              exit 1
+            fi
+            echo "Executable exists and has correct permissions: $exec_path"
+          done
+
+  # Job 3: Run tests
+  run_tests:
+    name: Run Tests
+    needs: check_program_compilation
+    # Skip if in mirror repository
+    if: ${{ github.event.repository.clone_url != env.MIRROR_URL }}
+    runs-on: ubuntu-latest
+    container:
+      image: epitechcontent/epitest-docker
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run tests
+        run: make tests_run
+        timeout-minutes: 2
+
+  # Job 4: Push to mirror repository
+  push_to_mirror:
+    name: Push to Mirror Repository
+    needs: run_tests
+    # Only run on push events and not in mirror repository
+    if: ${{ github.event_name == 'push' && github.event.repository.clone_url != env.MIRROR_URL }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # We need full history for mirroring
+
+      - name: Push to mirror
+        uses: pixta-dev/repository-mirroring-action@v1
+        with:
+          target_repo_url: ${{ env.MIRROR_URL }}
+          ssh_private_key: ${{ secrets.GIT_SSH_PRIVATE_KEY }}
