@@ -15,11 +15,30 @@ on:
       - 'ga-ignore-**'
 
 jobs:
+  # Initial job to check if we're in the mirror repository
+  check_repository:
+    name: Check Repository
+    runs-on: ubuntu-latest
+    outputs:
+      is_mirror: ${{ steps.check_mirror.outputs.is_mirror }}
+    steps:
+      - name: Check if current repository is mirror
+        id: check_mirror
+        run: |
+          REPO_URL="${{ github.event.repository.clone_url }}"
+          MIRROR_URL="${{ secrets.MIRROR_URL }}"
+          if [ "$REPO_URL" = "$MIRROR_URL" ]; then
+            echo "is_mirror=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_mirror=false" >> $GITHUB_OUTPUT
+          fi
+
   # Job 1: Check coding style
   check_coding_style:
     name: Check Coding Style
+    needs: check_repository
     # Skip if in mirror repository
-    if: ${{ github.event.repository.clone_url != env.MIRROR_URL }}
+    if: ${{ needs.check_repository.outputs.is_mirror == 'false' }}
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/epitech/coding-style-checker:latest
@@ -55,9 +74,9 @@ jobs:
   # Job 2: Check program compilation
   check_program_compilation:
     name: Check Program Compilation
-    needs: check_coding_style
+    needs: [check_repository, check_coding_style]
     # Skip if in mirror repository
-    if: ${{ github.event.repository.clone_url != env.MIRROR_URL }}
+    if: ${{ needs.check_repository.outputs.is_mirror == 'false' }}
     runs-on: ubuntu-latest
     container:
       image: epitechcontent/epitest-docker
@@ -74,7 +93,7 @@ jobs:
 
       - name: Check executables existence and permissions
         run: |
-          IFS=',' read -ra EXEC_LIST <<< "$EXECUTABLES"
+          IFS=',' read -ra EXEC_LIST <<< "${{ env.EXECUTABLES }}"
           for exec_path in "${EXEC_LIST[@]}"; do
             if [ ! -f "$exec_path" ]; then
               echo "::error::Executable not found: $exec_path"
@@ -90,9 +109,9 @@ jobs:
   # Job 3: Run tests
   run_tests:
     name: Run Tests
-    needs: check_program_compilation
+    needs: [check_repository, check_program_compilation]
     # Skip if in mirror repository
-    if: ${{ github.event.repository.clone_url != env.MIRROR_URL }}
+    if: ${{ needs.check_repository.outputs.is_mirror == 'false' }}
     runs-on: ubuntu-latest
     container:
       image: epitechcontent/epitest-docker
@@ -107,9 +126,9 @@ jobs:
   # Job 4: Push to mirror repository
   push_to_mirror:
     name: Push to Mirror Repository
-    needs: run_tests
+    needs: [check_repository, run_tests]
     # Only run on push events and not in mirror repository
-    if: ${{ github.event_name == 'push' && github.event.repository.clone_url != env.MIRROR_URL }}
+    if: ${{ github.event_name == 'push' && needs.check_repository.outputs.is_mirror == 'false' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
