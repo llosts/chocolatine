@@ -9,8 +9,8 @@
 
 int main(int argc, char const *argv[])
 {
-
-
-    
-    return chocolatine(argc, argv);
+    int ret = chocolatine(argc, argv);
+    if (ret == 84)
+        return 84;
+    return 0;
 }
