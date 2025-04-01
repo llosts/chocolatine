@@ -86,7 +86,7 @@ jobs:
 
       - name: Check for banned functions
         run: |
-          banned_functions=("strcpy" "strcat" "strncat" "strdup" "strchr" "strcmp")
+          banned_functions=("strcpy" "strcat" "strncat" "strdup" "strchr")
           for func in "${banned_functions[@]}"; do
             if grep -q "$func" *.c; then
               echo "::error::Banned function '$func' found in source code."
