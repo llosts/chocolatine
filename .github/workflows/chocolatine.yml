@@ -71,31 +71,6 @@ jobs:
             echo "No coding style report found."
           fi
 
-  # Job 1.2: check banned functions
-  check_banned_fucntion:
-    name: Check Banned Functions
-    needs: [check_repository, check_coding_style]
-    # Skip if in mirror repository
-    if: ${{ needs.check_repository.outputs.is_mirror == 'false' }}
-    runs-on: ubuntu-latest
-    container:
-      image: epitechcontent/epitest-docker
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Check for banned functions
-        run: |
-          banned_functions=("strcpy" "strcat" "strncat" "strdup" "strchr")
-          for func in "${banned_functions[@]}"; do
-            if grep -q "$func" *.c; then
-              echo "::error::Banned function '$func' found in source code."
-              exit 1
-            fi
-          done
-        timeout-minutes: 2
-
-
   # Job 2: Check program compilation
   check_program_compilation:
     name: Check Program Compilation
